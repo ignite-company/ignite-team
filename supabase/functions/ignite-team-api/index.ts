@@ -52,10 +52,12 @@ Deno.serve(async (req: Request) => {
         db.from("hq_revenue_events").select(selectFields.ledger).gte("paid_at",ledgerCutoff).eq("event_type","payment.succeeded").order("paid_at",{ascending:false}).limit(5000)
       ]);
       for(const x of [members,activity,calls,appointments,deals,links,ledger]) check(x.error);
+      const {data:integration,error:integrationError}=await db.from("ignite_team_integrations").select("enabled,updated_at").eq("id","ghl").maybeSingle();
+      check(integrationError);
       return response({success:true,viewer:profile.full_name||profile.email||"Ignite Admin",data:{
         members:members.data||[],activity:activity.data||[],calls:calls.data||[],
         appointments:appointments.data||[],deals:deals.data||[],links:links.data||[],
-        ledger:ledger.data||[],syncedAt:new Date().toISOString(),
+        ledger:ledger.data||[],integration:{ghlConfigured:!!integration?.enabled},syncedAt:new Date().toISOString(),
         windows:{activityDays:120,revenueDays:365}
       }});
     }
@@ -89,8 +91,9 @@ Deno.serve(async (req: Request) => {
       if(!uuid(e.member_id)||!clean(e.company_name)) return fail("Member and business are required");
       const status=clean(e.status,30)||"booked";
       if(!["booked","confirmed","showed","no_show","canceled"].includes(status)) return fail("Invalid appointment status");
-      const record={member_id:e.member_id,company_name:clean(e.company_name),contact_name:clean(e.contact_name)||null,
-        scheduled_at:validDate(e.scheduled_at),status,source:"manual",notes:clean(e.notes,2000)||null,updated_at:new Date().toISOString()};
+      const record:Record<string,unknown>={member_id:e.member_id,company_name:clean(e.company_name),contact_name:clean(e.contact_name)||null,
+        scheduled_at:validDate(e.scheduled_at),status,notes:clean(e.notes,2000)||null,updated_at:new Date().toISOString()};
+      if(!id) record.source="manual";
       const q=id?db.from("ignite_team_appointments").update(record).eq("id",id):db.from("ignite_team_appointments").insert(record);
       const {data,error}=await q.select("id").single();check(error);
       return response({success:true,id:data.id});
@@ -123,6 +126,18 @@ Deno.serve(async (req: Request) => {
       if(!uuid(id)) return fail("Invalid attribution");
       const {error}=await db.from("ignite_team_payment_links").delete().eq("id",id);check(error);
       return response({success:true});
+    }
+    if(action==="rotate_webhook_key"){
+      const bytes=new Uint8Array(32);crypto.getRandomValues(bytes);
+      const secret=Array.from(bytes,x=>x.toString(16).padStart(2,"0")).join("");
+      const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(secret));
+      const hash=Array.from(new Uint8Array(digest),x=>x.toString(16).padStart(2,"0")).join("");
+      const {error}=await db.from("ignite_team_integrations").upsert({id:"ghl",webhook_key_hash:hash,enabled:true,updated_at:new Date().toISOString()},{onConflict:"id"});
+      check(error);return response({success:true,webhook_key:secret});
+    }
+    if(action==="disable_webhook"){
+      const {error}=await db.from("ignite_team_integrations").update({enabled:false,updated_at:new Date().toISOString()}).eq("id","ghl");
+      check(error);return response({success:true});
     }
     return fail("Unknown action",404);
   } catch (err) {
