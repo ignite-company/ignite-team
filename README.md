@@ -15,8 +15,8 @@ Private operations dashboard for Ignite Co's team performance. iOS-inspired glas
 1. Deploy the static website to Vercel from this repository.
 2. The deployed `ignite-team-api` Supabase Edge Function and its database tables are hosted in the Ignite client-hub Supabase project.
 3. Sign in with an **existing admin** account from Ignite HQ.
-4. Configure `IGNITE_TEAM_GHL_WEBHOOK_SECRET` on Supabase and send valid GHL call/appointment payloads to the optional secure GHL ingestion endpoint once enabled.
-5. Map each caller's **GHL User ID** under Team Members.
+4. In **Integrations**, generate the single-use GHL webhook connection key and configure matching HighLevel Custom Webhook workflows. No server-side secret needs to be pasted into GitHub or the browser source.
+5. Map each caller's **GHL User ID** under Team Members, then test actual call and appointment events.
 
 Read `INTEGRATIONS.md` for event mapping and important limitations.
 
