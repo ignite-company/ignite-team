@@ -33,7 +33,7 @@ Deno.serve(async(req:Request)=>{
     if(!memberId)return reply({error:"Missing explicit GHL user ID for attribution"},422);
     const {data:member,error:memberError}=await db.from("ignite_team_members").select("id,full_name").eq("ghl_user_id",memberId).eq("status","active").maybeSingle();
     if(memberError)throw Error(memberError.message);
-    if(!member)return reply({error:"GHL user ID not mapped to active Ignite Team member"},422);
+    if(!member)return reply({error:"GHL user ID not mapped to active Ignite Team member",received_ghl_user_id:memberId},422);
     if(isCall){
       const eventId=text(payload.event_id||payload.external_id||payload.messageId,220);
       if(!eventId)return reply({error:"A stable event_id or messageId is required to avoid double counting"},422);
